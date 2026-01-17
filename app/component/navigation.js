@@ -13,6 +13,7 @@ export default function TopNav() {
 
   // Client mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
 
     // Load username from localStorage

@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-export async function middleware(req) {
+export async function proxy(req) {
   const token = req.cookies.get("token")?.value;
   const { pathname } = req.nextUrl;
 
-  // Allow login page
   if (pathname.startsWith("/login")) {
     return NextResponse.next();
   }
@@ -18,7 +17,7 @@ export async function middleware(req) {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     await jwtVerify(token, secret);
     return NextResponse.next();
-  } catch (error) {
+  } catch {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 }
