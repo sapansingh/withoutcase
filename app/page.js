@@ -1,230 +1,143 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import {
-  FaCar,
-  FaClock,
-  FaPhone,
-  FaMapMarkerAlt,
-  FaCity,
-  FaCheckCircle,
-  FaTimesCircle,
-} from "react-icons/fa";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { FaUser, FaLock, FaSignInAlt } from "react-icons/fa";
 
-export default function Home() {
-  const [session, setSession] = useState("free");
-  const [data, setData] = useState({
-    vehicleNo: "-",
-    triggerTime: "-",
-    contactNo: "-",
-    policeStation: "-",
-    district: "-",
-    notificationTime: "-",
-    unitID: "",
-    phoneNumber: "",
-  });
+export default function LoginPage() {
+  const [mounted, setMounted] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const [remarks, setRemarks] = useState([]);
-  const [selectedRemark, setSelectedRemark] = useState("");
-  const [otherRemarks, setOtherRemarks] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [timeCounter, setTimeCounter] = useState(0);
-  const intervalRef = useRef(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
 
-  const formatTime = (sec) => {
-    const h = Math.floor(sec / 3600).toString().padStart(2, "0");
-    const m = Math.floor((sec % 3600) / 60).toString().padStart(2, "0");
-    const s = (sec % 60).toString().padStart(2, "0");
-    return `${h}:${m}:${s}`;
-  };
-
-  const resetCounter = () => {
-    clearInterval(intervalRef.current);
-    setTimeCounter(0);
-    intervalRef.current = setInterval(() => setTimeCounter((prev) => prev + 1), 1000);
-  };
-
-  useEffect(() => {
-    fetch("/api/remarks")
-      .then((res) => res.json())
-      .then(setRemarks)
-      .catch(console.error);
-  }, []);
-
-  const getNotification = async () => {
-    if (session === "busy") return;
-    setSession("busy");
-    try {
-      const res = await fetch("/api/notification");
-      const json = await res.json();
-      if (json.status === "success") {
-        setData({
-          vehicleNo: json.data.vehicle_no,
-          triggerTime: json.data.trigger_time,
-          contactNo: json.data.contact_no,
-          policeStation: json.data.police_station,
-          district: json.data.district,
-          notificationTime: json.data.trigger_time,
-          unitID: json.data.unit_id,
-          phoneNumber: json.data.contact_no,
-        });
-        resetCounter();
-      } else {
-        setFailed(true);
-        setTimeout(() => setFailed(false), 5000);
-      }
-    } catch {
-      setFailed(true);
-      setTimeout(() => setFailed(false), 5000);
-    }
-  };
-
-  useEffect(() => {
-    const interval = setInterval(getNotification, 2000);
-    return () => clearInterval(interval);
-  }, [session]);
-
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+
     try {
-      const res = await fetch("/api/submit", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, selectedRemark, otherRemarks }),
+        body: JSON.stringify({ username, password }),
       });
-      const json = await res.json();
-      if (json.status === "success") {
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 5000);
-        setData({
-          vehicleNo: "-",
-          triggerTime: "-",
-          contactNo: "-",
-          policeStation: "-",
-          district: "-",
-          notificationTime: "-",
-          unitID: "",
-          phoneNumber: "",
-        });
-        setOtherRemarks("");
-        setSelectedRemark("");
-        setSession("free");
+      const data = await res.json();
+      setLoading(false);
+
+      if (res.ok) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("username", data.user.username);
+        localStorage.setItem("role", data.user.role);
+        localStorage.setItem("user_id", data.user.user_id);
+        router.push("/withoutcase");
       } else {
-        setFailed(true);
-        setTimeout(() => setFailed(false), 5000);
-        setSession("free");
+        setError(data.message || "Invalid credentials");
       }
     } catch {
-      setFailed(true);
-      setTimeout(() => setFailed(false), 5000);
-      setSession("free");
+      setError("Network error");
+      setLoading(false);
     }
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden p-4">
-      {/* Alerts */}
-      {success && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 w-4/5 max-w-xl bg-green-600 text-white p-4 rounded shadow-lg flex items-center space-x-2 animate-bounce">
-          <FaCheckCircle size={24} />
-          <span>Success! Submitted Successfully.</span>
-        </div>
-      )}
-      {failed && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 w-4/5 max-w-xl bg-red-600 text-white p-4 rounded shadow-lg flex items-center space-x-2 animate-bounce">
-          <FaTimesCircle size={24} />
-          <span>Failed! Already Submitted.</span>
-        </div>
-      )}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 px-4">
+      <div className="relative w-full max-w-md bg-white/40 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-10 overflow-hidden">
+        {/* Decorative blobs */}
+        <div className="absolute -top-16 -left-16 w-44 h-44 bg-purple-300 rounded-full opacity-40 blur-3xl animate-blob" />
+        <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-pink-300 rounded-full opacity-30 blur-3xl animate-blob animation-delay-2000" />
 
-      <div className="flex flex-1 gap-4">
-        {/* Left Column: Event Details */}
-        <div className="w-1/3 bg-white shadow-lg rounded-lg p-6 border border-gray-300 overflow-auto">
-          <h2 className="text-xl font-bold mb-4 text-green-700">Event Details</h2>
-          <ul className="space-y-3">
-            <li className="flex items-center space-x-3">
-              <FaCar className="text-green-500" />
-              <span className="font-semibold w-32">Vehicle Number:</span>
-              <span>{data.vehicleNo}</span>
-            </li>
-            <li className="flex items-center space-x-3">
-              <FaClock className="text-yellow-500" />
-              <span className="font-semibold w-32">Trigger Time:</span>
-              <span>{data.triggerTime}</span>
-            </li>
-            <li className="flex items-center space-x-3">
-              <FaPhone className="text-blue-500" />
-              <span className="font-semibold w-32">Pilot Mobile:</span>
-              <span>{data.contactNo}</span>
-            </li>
-            <li className="flex items-center space-x-3">
-              <FaMapMarkerAlt className="text-red-500" />
-              <span className="font-semibold w-32">Base Location:</span>
-              <span>{data.policeStation}</span>
-            </li>
-            <li className="flex items-center space-x-3">
-              <FaCity className="text-purple-500" />
-              <span className="font-semibold w-32">District:</span>
-              <span>{data.district}</span>
-            </li>
-          </ul>
-        </div>
+        {/* Card Content */}
+        <div className="relative z-10">
+          <div className="flex justify-center mb-8">
+            <div className="bg-white text-gray-900 font-extrabold px-6 py-3 rounded-xl shadow-lg text-2xl tracking-wider uppercase">
+              Ambulance 108
+            </div>
+          </div>
 
-        {/* Right Column: FRV Form + Map */}
-        <div className="w-2/3 flex flex-col gap-4">
-          {/* Small FRV Form on top */}
-          <div className="h-1/4 bg-white shadow-lg rounded-lg p-4 border border-gray-300 overflow-auto">
-            <div className="flex justify-between items-center mb-2 bg-yellow-400 p-2 rounded-lg shadow-md">
-              <h2 className="text-lg font-bold">FRV Move Without Event</h2>
-              <span className="text-red-700 font-extrabold text-xl tracking-wide">
-                {formatTime(timeCounter)}
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-1">
+            Welcome Back
+          </h2>
+          <p className="text-gray-700 text-center mb-6">
+            Login to Fleet Monitoring System
+          </p>
+
+          {/* Error */}
+          {error && (
+            <div className="mb-4 text-red-100 bg-red-500/80 px-4 py-2 rounded-lg text-sm text-center">
+              {error}
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-5">
+            {/* Username */}
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <FaUser />
               </span>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                className="w-full pl-12 pr-4 py-3 rounded-xl bg-white/80 text-gray-900 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition"
+                placeholder="Username"
+              />
+           
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-2 text-sm">
-              <select
-                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-green-300"
-                value={selectedRemark}
-                onChange={(e) => setSelectedRemark(e.target.value)}
+            {/* Password */}
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <FaLock />
+              </span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
-              >
-                <option value="">Select Remarks</option>
-                {remarks.map((r, idx) => (
-                  <option key={idx} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-
-              <textarea
-                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-300"
-                placeholder="Other Remarks"
-                value={otherRemarks}
-                onChange={(e) => setOtherRemarks(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 rounded-xl bg-white/80 text-gray-900 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white transition"
+                placeholder="Password"
               />
+             
+            </div>
 
-              <button
-                type="submit"
-                className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-bold"
-              >
-                Submit
-              </button>
-            </form>
-          </div>
+            {/* Login Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 rounded-xl font-bold shadow-lg transition transform hover:-translate-y-1 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? "Authenticating..." : <><FaSignInAlt /> Login</>}
+            </button>
+          </form>
 
-          {/* Map occupies remaining space */}
-          <div className="flex-1 bg-white shadow-lg rounded-lg border border-gray-300 overflow-hidden">
-            <h2 className="text-xl font-bold mb-2 p-4 text-blue-700 bg-gray-50 border-b border-gray-200">
-              Vehicle Location
-            </h2>
-            <iframe
-              src="https://rj.glovision.co/gvkrajasthan/php/tripMap.php?accountID=gvkrajasthan&vehicleID=RJ14PD7019&onlyidles=no"
-              className="w-full h-full"
-              allowFullScreen
-            ></iframe>
-          </div>
+          {/* Footer */}
+          <p className="text-center text-gray-500 text-sm mt-8">
+            © {new Date().getFullYear()} Ambulance Monitoring System
+          </p>
         </div>
+
+        {/* Animations */}
+        <style jsx>{`
+          .animate-blob {
+            animation: blob 7s infinite;
+          }
+          .animation-delay-2000 {
+            animation-delay: 2s;
+          }
+          @keyframes blob {
+            0%, 100% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+          }
+        `}</style>
       </div>
     </div>
   );
