@@ -98,7 +98,10 @@ export default function WithoutCase() {
     setSession("busy");
 
     try {
-      const res = await fetch("/api/notification");
+ const res = await fetch(
+  `/api/notification?userId=${encodeURIComponent(user.userId)}`
+);
+
       const json = await res.json();
 
       if (json.status === "success" && json.data.length > 0) {

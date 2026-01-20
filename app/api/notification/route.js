@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 
-// MySQL connection config
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -9,13 +8,24 @@ const dbConfig = {
   database: process.env.DB_NAME,
 };
 
-export async function GET() {
+export async function GET(req) {
   let connection;
+
   try {
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId");
+
+    if (!userId) {
+      return NextResponse.json(
+        { status: "failed", message: "UserId required" },
+        { status: 400 }
+      );
+    }
+
     connection = await mysql.createConnection(dbConfig);
 
-    // Updated query
-    const [rows] = await connection.execute(`
+    const [rows] = await connection.execute(
+      `
       SELECT 
         vs.Vehicle_Number,
         ftl.Speed,
@@ -30,11 +40,20 @@ export async function GET() {
       JOIN emri.m_district emd ON emd.district_id = mv.district_id
       WHERE vs.status_id = '1'
         AND mv.is_active = '1'
-        AND mv.vehicle_type_id IN ("108","420")
+        AND mv.vehicle_type_id IN ('108','420')
         AND ftl.Speed > 10
-        AND (triger_agent IS NULL OR triger_agent = '' OR triger_agent = '-' or triger_agent="95356")
-        AND (expected_stop < NOW() OR expected_stop IS NULL) AND ftl.Rec_Time >= NOW() - INTERVAL 1 HOUR LIMIT 1
-    `);
+        AND (
+          vs.triger_agent IS NULL
+          OR vs.triger_agent = ''
+          OR vs.triger_agent = '-'
+          OR vs.triger_agent = ?
+        )
+        AND (vs.expected_stop < NOW() OR vs.expected_stop IS NULL)
+        AND ftl.Rec_Time >= NOW() - INTERVAL 1 HOUR
+      LIMIT 1
+      `,
+      [userId]
+    );
 
     const data = rows.map((r) => ({
       ...r,
