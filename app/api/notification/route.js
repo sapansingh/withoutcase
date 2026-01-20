@@ -8,6 +8,25 @@ const dbConfig = {
   database: process.env.DB_NAME,
 };
 
+/**
+ * Convert UTC Date → IST Railway format
+ * Output: YYYY-MM-DD HH:mm:ss
+ */
+function toISTRailway(date) {
+  if (!date) return null;
+
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+
+  // sv-SE gives perfect YYYY-MM-DD HH:mm:ss
+  return d
+    .toLocaleString("sv-SE", {
+      timeZone: "Asia/Kolkata",
+      hour12: false,
+    })
+    .replace("T", " ");
+}
+
 export async function GET(req) {
   let connection;
 
@@ -56,8 +75,16 @@ export async function GET(req) {
     );
 
     const data = rows.map((r) => ({
-      ...r,
-      trigger_time: new Date(r.last_assigned_time).toISOString(),
+      Vehicle_Number: r.Vehicle_Number,
+      Speed: r.Speed,
+      district_name: r.district_name,
+      location_name: r.location_name,
+      contact_number: r.contact_number,
+
+      // ✅ IST Railway Time
+      last_assigned_time: toISTRailway(r.last_assigned_time),
+      Rec_Time: toISTRailway(r.Rec_Time),
+      trigger_time: toISTRailway(r.last_assigned_time),
     }));
 
     return NextResponse.json({

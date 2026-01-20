@@ -12,16 +12,44 @@ import {
   FaTimesCircle,
 } from "react-icons/fa";
 
+/* ================== TIME FORMATTER ================== */
+/**
+ * Convert ISO / UTC → IST Railway format
+ * Output: YYYY-MM-DD HH:mm:ss
+ */
+function formatIST(dateStr) {
+  if (!dateStr) return "-";
+
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "-";
+
+  return d
+    .toLocaleString("sv-SE", {
+      timeZone: "Asia/Kolkata",
+      hour12: false,
+    })
+    .replace("T", " ");
+}
+
 export default function WithoutCase() {
   const router = useRouter();
 
   const [session, setSession] = useState("free");
+
   const [data, setData] = useState({
     vehicleNo: "-",
     speed: "-",
-    lastAssigned: "-",
-    recordTime: "-",
-    triggerTime: "-",
+
+    // backend (ISO)
+    lastAssigned: null,
+    recordTime: null,
+    triggerTime: null,
+
+    // UI (Railway Time)
+    lastAssignedDisplay: "-",
+    recordTimeDisplay: "-",
+    triggerTimeDisplay: "-",
+
     district: "-",
     location: "-",
     contactNo: "-",
@@ -40,20 +68,13 @@ export default function WithoutCase() {
 
   const intervalRef = useRef(null);
   const pollingRef = useRef(null);
-
   const activeVehicleRef = useRef("-");
 
-  /* ---------------- AUTHENTICATION CHECK ---------------- */
+  /* ================== AUTH ================== */
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     const username = localStorage.getItem("username");
     const userId = localStorage.getItem("user_id");
-
-    // debug logs
-    console.log("username:", username);
-    console.log("userId:", userId);
 
     if (!username || !userId || username === "-" || userId === "-") {
       router.push("/login");
@@ -63,12 +84,12 @@ export default function WithoutCase() {
     setUser({ username, userId });
   }, [router]);
 
-  /* ---------------- TIMER ---------------- */
+  /* ================== TIMER ================== */
 
   const formatTime = (sec) => {
-    const h = Math.floor(sec / 3600).toString().padStart(2, "0");
-    const m = Math.floor((sec % 3600) / 60).toString().padStart(2, "0");
-    const s = (sec % 60).toString().padStart(2, "0");
+    const h = String(Math.floor(sec / 3600)).padStart(2, "0");
+    const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
     return `${h}:${m}:${s}`;
   };
 
@@ -76,21 +97,21 @@ export default function WithoutCase() {
     clearInterval(intervalRef.current);
     setTimeCounter(0);
     intervalRef.current = setInterval(
-      () => setTimeCounter((prev) => prev + 1),
+      () => setTimeCounter((p) => p + 1),
       1000
     );
   };
 
-  /* ---------------- LOAD REMARKS ---------------- */
+  /* ================== LOAD REMARKS ================== */
 
   useEffect(() => {
     fetch("/api/remarks")
-      .then((res) => res.json())
-      .then((json) => setRemarks(json))
+      .then((r) => r.json())
+      .then(setRemarks)
       .catch(console.error);
   }, []);
 
-  /* ---------------- NOTIFICATION ---------------- */
+  /* ================== NOTIFICATION ================== */
 
   const getNotification = async () => {
     if (session === "busy" || activeVehicleRef.current !== "-") return;
@@ -98,52 +119,45 @@ export default function WithoutCase() {
     setSession("busy");
 
     try {
- const res = await fetch(
-  `/api/notification?userId=${encodeURIComponent(user.userId)}`
-);
-
+      const res = await fetch(
+        `/api/notification?userId=${encodeURIComponent(user.userId)}`
+      );
       const json = await res.json();
 
       if (json.status === "success" && json.data.length > 0) {
         const v = json.data[0];
 
-        try {
-          await fetch("/api/agentput", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              agentId: user.userId,
-              vehicleNo: v.Vehicle_Number,
-            }),
-          });
-        } catch (agentErr) {
-          console.error("agentput failed", agentErr);
-        }
+        await fetch("/api/agentput", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            agentId: user.userId,
+            vehicleNo: v.Vehicle_Number,
+          }),
+        });
 
         activeVehicleRef.current = v.Vehicle_Number;
 
-   setData({
-  vehicleNo: v.Vehicle_Number,
-  speed: v.Speed,
+        setData({
+          vehicleNo: v.Vehicle_Number,
+          speed: v.Speed,
 
-  // ✅ ISO for backend
-  lastAssigned: new Date(v.last_assigned_time).toISOString(),
-  recordTime: new Date(v.Rec_Time).toISOString(),
-  triggerTime: new Date(v.Rec_Time).toISOString(),
+          // backend ISO
+          lastAssigned: v.last_assigned_time,
+          recordTime: v.Rec_Time,
+          triggerTime: v.Rec_Time,
 
-  // display-only fields
-  lastAssignedDisplay: new Date(v.last_assigned_time).toLocaleString(),
-  recordTimeDisplay: new Date(v.Rec_Time).toLocaleString(),
-  triggerTimeDisplay: new Date(v.Rec_Time).toLocaleString(),
+          // UI railway time
+          lastAssignedDisplay: formatIST(v.last_assigned_time),
+          recordTimeDisplay: formatIST(v.Rec_Time),
+          triggerTimeDisplay: formatIST(v.Rec_Time),
 
-  district: v.district_name,
-  location: v.location_name,
-  contactNo: v.contact_number,
-});
-
+          district: v.district_name,
+          location: v.location_name,
+          contactNo: v.contact_number,
+        });
 
         resetCounter();
-
         clearInterval(pollingRef.current);
         pollingRef.current = null;
       }
@@ -154,7 +168,7 @@ export default function WithoutCase() {
     }
   };
 
-  /* ---------------- START POLLING ONLY AFTER USER IS SET ---------------- */
+  /* ================== START POLLING ================== */
 
   useEffect(() => {
     if (user.userId === "-" || user.username === "-") return;
@@ -168,7 +182,7 @@ export default function WithoutCase() {
     };
   }, [user]);
 
-  /* ---------------- SUBMIT ---------------- */
+  /* ================== SUBMIT ================== */
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -177,9 +191,11 @@ export default function WithoutCase() {
     try {
       const payload = {
         ...data,
+        expectedStop: expectedStop
+          ? new Date(expectedStop).toISOString()
+          : null,
         selectedRemark,
         otherRemarks,
-        expectedStop,
         submittedBy: user.username,
         submittedById: user.userId,
       };
@@ -194,16 +210,19 @@ export default function WithoutCase() {
 
       if (json.status === "success") {
         setSuccess(true);
-        setTimeout(() => setSuccess(false), 5000);
+        setTimeout(() => setSuccess(false), 4000);
 
         activeVehicleRef.current = "-";
 
         setData({
           vehicleNo: "-",
           speed: "-",
-          lastAssigned: "-",
-          recordTime: "-",
-          triggerTime: "-",
+          lastAssigned: null,
+          recordTime: null,
+          triggerTime: null,
+          lastAssignedDisplay: "-",
+          recordTimeDisplay: "-",
+          triggerTimeDisplay: "-",
           district: "-",
           location: "-",
           contactNo: "-",
@@ -212,20 +231,18 @@ export default function WithoutCase() {
         setSelectedRemark("");
         setOtherRemarks("");
         setExpectedStop("");
-
         clearInterval(intervalRef.current);
         setTimeCounter(0);
 
-        clearInterval(pollingRef.current);
         pollingRef.current = setInterval(getNotification, 3000);
       } else {
         setFailed(true);
-        setTimeout(() => setFailed(false), 5000);
+        setTimeout(() => setFailed(false), 4000);
       }
     } catch (err) {
       console.error(err);
       setFailed(true);
-      setTimeout(() => setFailed(false), 5000);
+      setTimeout(() => setFailed(false), 4000);
     }
   };
 

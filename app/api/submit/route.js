@@ -40,7 +40,6 @@ export async function POST(req) {
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      timezone: "Z", // store in UTC
     });
 
     // 1️⃣ INSERT into ambulance_remarks
