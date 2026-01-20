@@ -119,16 +119,25 @@ export default function WithoutCase() {
 
         activeVehicleRef.current = v.Vehicle_Number;
 
-        setData({
-          vehicleNo: v.Vehicle_Number,
-          speed: v.Speed,
-          lastAssigned: new Date(v.last_assigned_time).toLocaleString(),
-          recordTime: new Date(v.Rec_Time).toLocaleString(),
-          triggerTime: new Date(v.Rec_Time).toLocaleString(),
-          district: v.district_name,
-          location: v.location_name,
-          contactNo: v.contact_number,
-        });
+   setData({
+  vehicleNo: v.Vehicle_Number,
+  speed: v.Speed,
+
+  // ✅ ISO for backend
+  lastAssigned: new Date(v.last_assigned_time).toISOString(),
+  recordTime: new Date(v.Rec_Time).toISOString(),
+  triggerTime: new Date(v.Rec_Time).toISOString(),
+
+  // display-only fields
+  lastAssignedDisplay: new Date(v.last_assigned_time).toLocaleString(),
+  recordTimeDisplay: new Date(v.Rec_Time).toLocaleString(),
+  triggerTimeDisplay: new Date(v.Rec_Time).toLocaleString(),
+
+  district: v.district_name,
+  location: v.location_name,
+  contactNo: v.contact_number,
+});
+
 
         resetCounter();
 
